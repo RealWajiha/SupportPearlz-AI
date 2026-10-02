@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.document_loaders import DirectoryLoader, TextLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
@@ -9,7 +9,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 
 # 1. Page Configuration
-st.set_page_config(page_title="SupportPearlz AI", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="SupportPearlz Knowledge Agent", page_icon="🤖", layout="wide")
 
 # 2. Session State Setup
 if "openai_api_key" not in st.session_state:
@@ -44,8 +44,29 @@ def load_or_build_vector_store(api_key):
         if not os.path.exists(kb_dir):
             return None
         
-        loader = DirectoryLoader(kb_dir, glob="**/*.*")
-        raw_docs = loader.load()
+        raw_docs = []
+        
+        # Load .txt files
+        try:
+            txt_loader = DirectoryLoader(kb_dir, glob="**/*.txt", loader_cls=TextLoader, loader_kwargs={"encoding": "utf-8"})
+            raw_docs.extend(txt_loader.load())
+        except Exception:
+            pass
+
+        # Load files without extension or .md files
+        try:
+            all_loader = DirectoryLoader(kb_dir, glob="**/*", loader_cls=TextLoader, loader_kwargs={"encoding": "utf-8"})
+            raw_docs.extend(all_loader.load())
+        except Exception:
+            pass
+
+        # Load .pdf files
+        try:
+            pdf_loader = DirectoryLoader(kb_dir, glob="**/*.pdf", loader_cls=PyPDFLoader)
+            raw_docs.extend(pdf_loader.load())
+        except Exception:
+            pass
+
         if not raw_docs:
             return None
         
@@ -86,9 +107,9 @@ with st.sidebar:
             else:
                 st.error("No documents found in `./data/knowledge_base`.")
 
-# Main Chat Header
+# Main Header
 st.title("🤖 SupportPearlz Customer Support Agent")
-st.caption("LangChain-powered RAG Knowledge Agent")
+st.caption("Grounded AI Assistant for Pearlz Home Systems")
 
 # Load Vector Store
 vector_store = load_or_build_vector_store(api_key)
@@ -130,7 +151,6 @@ if user_query := st.chat_input("Ask a question about Pearlz products or knowledg
                     Question: {question}
                     """)
                     
-                    # LCEL RAG Chain
                     rag_chain = (
                         {"context": retriever | format_docs, "question": RunnablePassthrough()}
                         | prompt
