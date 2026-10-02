@@ -1,0 +1,17 @@
+AI & Machine Learning Engineering Knowledge Base
+
+1. Machine Learning Basics:
+- Supervised Learning: Model is trained on labeled data (e.g., Regression, Classification).
+- Unsupervised Learning: Model finds hidden patterns in unlabeled data (e.g., K-Means Clustering, PCA).
+- Overfitting: When a model learns noise in training data. Solution: Regularization, Dropout, Cross-validation.
+
+2. RAG (Retrieval-Augmented Generation) & Vector Search:
+- RAG combines retrieval systems with generative LLMs to answer queries using custom data.
+- Text Chunking: Splitting large text into smaller chunks using RecursiveCharacterTextSplitter.
+- Embeddings: Converting text into high-dimensional vector representations.
+- Vector DB: FAISS, ChromaDB, and Pinecone store embeddings for fast semantic similarity search.
+
+3. Evaluation Metrics:
+- Precision: True Positives / (True Positives + False Positives). Focuses on accuracy of positive predictions.
+- Recall: True Positives / (True Positives + False Negatives). Focuses on capturing all positive cases.
+- F1-Score: Harmonic mean of Precision and Recall.
