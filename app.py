@@ -4,9 +4,9 @@ from langchain_community.document_loaders import DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 
 # 1. Page Configuration
 st.set_page_config(page_title="SupportPearlz AI", page_icon="🤖", layout="wide")
@@ -37,7 +37,7 @@ if not st.session_state["openai_api_key"]:
                 st.error("Please enter a valid OpenAI API Key starting with sk-")
     st.stop()
 
-# 4. Helper Function: Build or Load Vector Store
+# 4. Helper Function: Load or Build Vector Store
 def load_or_build_vector_store(api_key):
     if st.session_state["vector_store"] is None:
         kb_dir = "./data/knowledge_base"
@@ -57,8 +57,11 @@ def load_or_build_vector_store(api_key):
         
     return st.session_state["vector_store"]
 
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
 # ------------------------------------------------------------------
-# 5. MAIN APP INTERFACE (API Key Enter hone ke baad)
+# 5. MAIN APP INTERFACE
 # ------------------------------------------------------------------
 api_key = st.session_state["openai_api_key"]
 
@@ -100,12 +103,10 @@ for msg in st.session_state["messages"]:
 
 # User Chat Input & Response Logic
 if user_query := st.chat_input("Ask a question about Pearlz products or knowledge base..."):
-    # User message display karein
     st.session_state["messages"].append({"role": "user", "content": user_query})
     with st.chat_message("user"):
         st.markdown(user_query)
 
-    # Answer generate karein
     if vector_store is None:
         answer = "Knowledge base empty hai. Pehle file upload karein aur Index Rebuild karein."
         with st.chat_message("assistant"):
@@ -118,22 +119,26 @@ if user_query := st.chat_input("Ask a question about Pearlz products or knowledg
                     llm = ChatOpenAI(model="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.2)
                     retriever = vector_store.as_retriever(search_kwargs={"k": 3})
                     
-                    system_prompt = (
-                        "You are a helpful customer support and AI assistant. "
-                        "Use the following context to answer the user question accurately. "
-                        "If you don't know the answer based on context, state politely that information is not available.\n\n"
-                        "Context:\n{context}"
+                    prompt = ChatPromptTemplate.from_template("""
+                    You are a helpful customer support and AI assistant.
+                    Use the following context to answer the user question accurately.
+                    If you don't know the answer based on context, state politely that information is not available.
+
+                    Context:
+                    {context}
+
+                    Question: {question}
+                    """)
+                    
+                    # LCEL RAG Chain
+                    rag_chain = (
+                        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+                        | prompt
+                        | llm
+                        | StrOutputParser()
                     )
-                    prompt = ChatPromptTemplate.from_messages([
-                        ("system", system_prompt),
-                        ("human", "{input}"),
-                    ])
                     
-                    question_answer_chain = create_stuff_documents_chain(llm, prompt)
-                    rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-                    
-                    response = rag_chain.invoke({"input": user_query})
-                    answer = response.get("answer", "No response generated.")
+                    answer = rag_chain.invoke(user_query)
                     
                     st.markdown(answer)
                     st.session_state["messages"].append({"role": "assistant", "content": answer})
